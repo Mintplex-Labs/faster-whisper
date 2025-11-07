@@ -6,6 +6,7 @@ __pycache__/
 
 # Distribution / Packaging
 venv/
+.venv/
 
 # Unit Test
 .pytest_cache/
@@ -13,3 +14,5 @@ venv/
 # Ignore IDE, Editor Files
 .idea/
 .vscode/
+
+*.egg-info
