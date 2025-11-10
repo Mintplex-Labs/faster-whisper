@@ -1,47 +1,44 @@
-from typing import Union, BinaryIO
-import soundfile as sf
 import numpy as np
-from scipy.signal import resample_poly
+import librosa
+from typing import Union, BinaryIO, Tuple
+
+# NOTE: The helper functions _ignore_invalid_frames, _group_frames, and 
+# _resample_frames are no longer needed, as librosa.load handles decoding 
+# and resampling in a single call.
 
 def decode_audio(
     input_file: Union[str, BinaryIO],
     sampling_rate: int = 16000,
     split_stereo: bool = False,
-):
-    """
-    Decodes and resamples the audio to sampling_rate (default 16000 Hz) 
-    using soundfile and scipy.signal.
-    """
-    audio, sr = sf.read(input_file, dtype="float32")
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    """Decodes and resamples the audio using librosa.
 
-    if sr != sampling_rate:
-        print(f"Resampling audio from {sr} Hz to {sampling_rate} Hz.")
-        if audio.ndim == 2:
-            print("Audio is stereo, resampling both channels.")
-            audio_resampled = np.zeros(
-                (int(audio.shape[0] * sampling_rate / sr), 2), dtype=np.float32
-            )
-            for i in range(2):
-                audio_resampled[:, i] = resample_poly(
-                    audio[:, i], sampling_rate, sr
-                ).astype(np.float32)
-            audio = audio_resampled
-        else:
-            audio = resample_poly(audio, sampling_rate, sr).astype(np.float32)
+    Args:
+      input_file: Path to the input file or a file-like object.
+      sampling_rate: Resample the audio to this sample rate (default 16000 Hz).
+      split_stereo: Return separate left and right channels.
 
+    Returns:
+      A float32 Numpy array (mono) or a 2-tuple of float32 Numpy arrays (stereo split).
+    """
+    mono_mode = True if not split_stereo else False
+    audio_data, sr = librosa.load(
+        input_file,
+        sr=sampling_rate, 
+        mono=mono_mode,   
+        dtype=np.float32,
+    )
+    
     if split_stereo:
-        if audio.ndim == 2 and audio.shape[1] == 2:
-            left_channel = audio[:, 0]
-            right_channel = audio[:, 1]
+        if audio_data.ndim == 2 and audio_data.shape[0] >= 2:
+            left_channel = audio_data[0, :]
+            right_channel = audio_data[1, :]
             return left_channel, right_channel
-        elif audio.ndim == 1:
-            print("Warning: Attempted to split stereo, but audio is mono.")
-            return audio, audio
-
-    # Convert stereo to mono by averaging the channels
-    if audio.ndim == 2: audio = audio.mean(axis=1)
-
-    return audio
+            
+        elif audio_data.ndim == 1:
+            print("Warning: Attempted to split stereo, but audio source is mono.")
+            return audio_data, audio_data
+    return audio_data.flatten() 
 
 def pad_or_trim(array, length: int = 3000, *, axis: int = -1):
     """
