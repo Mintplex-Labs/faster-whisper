@@ -3,4 +3,5 @@ huggingface_hub>=0.21
 tokenizers>=0.13,<1
 onnxruntime>=1.14,<2 
 soundfile==0.13.1
+scipy==1.16.3
 tqdm

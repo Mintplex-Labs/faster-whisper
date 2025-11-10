@@ -1,6 +1,7 @@
 from typing import Union, BinaryIO
 import soundfile as sf
 import numpy as np
+from scipy.signal import resample_poly
 
 def decode_audio(
     input_file: Union[str, BinaryIO],
@@ -8,14 +9,25 @@ def decode_audio(
     split_stereo: bool = False,
 ):
     """
-    Decodes the audio using soundfile. Assumes audio is pre-resampled to 16000 Hz mono channel.
+    Decodes and resamples the audio to sampling_rate (default 16000 Hz) 
+    using soundfile and scipy.signal.
     """
     audio, sr = sf.read(input_file, dtype="float32")
 
     if sr != sampling_rate:
-         # WARNING: soundfile does NOT resample. If sr != 16000, the output will be incorrect.
-         # Always assume the audio is already resampled to 16000 Hz mono channel.
-         print(f"Warning: Audio sample rate is {sr} Hz, but expected {sampling_rate} Hz. Resampling is required for correctness.")
+        print(f"Resampling audio from {sr} Hz to {sampling_rate} Hz.")
+        if audio.ndim == 2:
+            print("Audio is stereo, resampling both channels.")
+            audio_resampled = np.zeros(
+                (int(audio.shape[0] * sampling_rate / sr), 2), dtype=np.float32
+            )
+            for i in range(2):
+                audio_resampled[:, i] = resample_poly(
+                    audio[:, i], sampling_rate, sr
+                ).astype(np.float32)
+            audio = audio_resampled
+        else:
+            audio = resample_poly(audio, sampling_rate, sr).astype(np.float32)
 
     if split_stereo:
         if audio.ndim == 2 and audio.shape[1] == 2:
@@ -23,12 +35,11 @@ def decode_audio(
             right_channel = audio[:, 1]
             return left_channel, right_channel
         elif audio.ndim == 1:
-            print("Warning: Attempted to split stereo, but audio is already mono.")
+            print("Warning: Attempted to split stereo, but audio is mono.")
             return audio, audio
 
-    # If the audio is stereo, convert it to mono by averaging the channels
-    if audio.ndim == 2:
-        audio = audio.mean(axis=1)
+    # Convert stereo to mono by averaging the channels
+    if audio.ndim == 2: audio = audio.mean(axis=1)
 
     return audio
 
